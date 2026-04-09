@@ -40,4 +40,4 @@ For mobile integration, the model expects a flattened array of 1035 features:
 *   **1024-1026:** Physics (Scaled Crest, ZCR, ECR).
 *   **1027-1034:** Veto Probabilities (Speech, Laughter, Sneeze, etc.).
 
----# cough_model
+---
