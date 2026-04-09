@@ -1,0 +1,19 @@
+# --- AI & Deep Learning Frameworks ---
+tensorflow>=2.15.0       # For YAMNet and MLP training
+tensorflow-hub           # For loading the YAMNet backbone
+torch>=2.0.0             # For HuBERT Base model
+torchaudio>=2.0.0        # For HuBERT feature extraction
+pytorch-lightning>=2.0.0 # For the Refiner interface
+torchmetrics             # For accuracy/recall calculations
+
+# --- Audio Processing & Physics ---
+librosa                  # For standardized audio loading and physics (Spectral Centroid)
+pydub                    # For VAD temporal slicing
+scipy                    # For Savgol filter and Peak Finding (find_peaks)
+
+# --- Data Handling & Analysis ---
+numpy<2.0.0              # Fixed to 1.x to ensure compatibility with TF and Torch
+pandas                   # For generating CSV results and Audit reports
+scikit-learn             # For dataset oversampling and train/test splitting
+tqdm                     # For progress bars during batch processing
+matplotlib               # For VAD Glance/Audit PNG generation
