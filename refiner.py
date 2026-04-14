@@ -18,9 +18,10 @@ class AcousticRefiner:
         wav_data = np.array(wav_data).flatten().astype(np.float32)
         
         # ---SCALE CHECK ---
-        # If data is in 16-bit integers (max > 1.0), scale to float
-        if np.max(np.abs(wav_data)) > 1.0:
-            wav_data = wav_data / 32768.0
+        # Prevent math collapse: safe, dynamic peak normalization across all bit depths
+        max_abs = np.max(np.abs(wav_data))
+        if max_abs > 1.0:
+            wav_data = wav_data / (max_abs + 1e-8)
 
         envelope = np.abs(wav_data)
         data_len = len(envelope)

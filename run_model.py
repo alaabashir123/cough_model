@@ -42,8 +42,8 @@ def sanitize_and_rename(target_path):
     """Clean the dataset: Convert FLAC to WAV, delete silent files, standardize names."""
     print(f"\n--- Stage 0: Sanitizing Dataset in {target_path} ---")
     
-    # 1. Look for .wav and .flac files
-    files = [f for f in os.listdir(target_path) if f.lower().endswith(('.wav', '.flac'))]
+    # 1. Look for .wav and .flac files (sorted for determinism)
+    files = sorted([f for f in os.listdir(target_path) if f.lower().endswith(('.wav', '.flac', '.mp3'))])
     
     if not files:
         print("!!! No audio files found in directory.")
@@ -73,18 +73,28 @@ def sanitize_and_rename(target_path):
                     break
             
             counts[intent] = counts.get(intent, 0) + 1
-            new_name = f"{intent}_{str(counts[intent]).zfill(3)}.wav"
+            # Temporarily save as .tmp.wav to prevent overwriting other files that haven't been processed yet
+            new_name = f"{intent}_{str(counts[intent]).zfill(3)}.tmp.wav"
             new_path = os.path.join(target_path, new_name)
 
             # 5. Convert to WAV and export
             audio.export(new_path, format="wav")
             
-            # 6. Cleanup: If the original was a .flac or had a different name, delete it
-            if os.path.abspath(path) != os.path.abspath(new_path):
-                os.remove(path)
+            # 6. Cleanup: Remove the original file now that it's safe 
+            os.remove(path)
 
         except Exception as e:
             print(f"Error processing {filename}: {e}")
+
+    # 7. Finalize names (rename .tmp.wav to .wav)
+    for temp_filename in os.listdir(target_path):
+        if temp_filename.endswith('.tmp.wav'):
+            final_name = temp_filename.replace('.tmp.wav', '.wav')
+            temp_path = os.path.join(target_path, temp_filename)
+            final_path = os.path.join(target_path, final_name)
+            if os.path.exists(final_path):
+                os.remove(final_path)
+            os.rename(temp_path, final_path)
 
 
 def run_clinical_pipeline(target_path):
@@ -191,11 +201,11 @@ if __name__ == "__main__":
     if os.path.exists(args.folder):
         final_path = run_clinical_pipeline(args.folder)
         # print(f"\nAUDIT COMPLETE.")
-        # print(f"Clinical Report: {final_path}")
+        print(f"Clinical Report: {final_path}")
         # print(f"Detailed CSV: cough_monitor_results/segment_details.csv")
     else:
         print(f"Error: Folder {args.folder} not found.")
     
     if os.path.exists('vad_audio'):
         shutil.rmtree('vad_audio')
-        print("--- Workspace Cleaned: temporary VAD files deleted ---")
+        # print("--- Workspace Cleaned: temporary VAD files deleted ---")

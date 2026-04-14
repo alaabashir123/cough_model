@@ -62,6 +62,8 @@ class YAMNetClassifier:
             sr = 16000
 
         # --- 2. VOLUME GATE (THE SILENCE FILTER) ---
+        # Recalculate max_abs after processing/resampling
+        max_abs = np.max(np.abs(wav_data))
         rms = np.sqrt(np.mean(wav_data**2))
         if rms < 0.001 or max_abs < 0.01:
             return {
@@ -78,7 +80,7 @@ class YAMNetClassifier:
         zcr = np.mean(np.abs(np.diff(np.sign(wav_data))) > 0) # Turbulence
         
         # ECR (Energy Concentration Ratio) - Measure the tightness of the burst
-        mid = len(wav_data) // 2
+        mid = np.argmax(np.abs(wav_data)) # Focus on true acoustic peak
         core = wav_data[max(0, mid-480):min(len(wav_data), mid+480)] # 60ms core window
         ecr = (np.sqrt(np.mean(core**2)) + 1e-6) / safe_rms
 
