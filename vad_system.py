@@ -52,7 +52,7 @@ class SystematicVAD:
         # Never go quieter than -55dB (for extremely quiet files like 014)
         thresh = max(thresh, -55)
         # Never let thresh get closer than 3dB to the peak
-        thresh = min(thresh, peak - 3.0)
+        thresh = min(thresh, peak - 10.0)
 
         # print(f"--- VAD: {audio_filename} | Peak: {round(peak, 2)} | Thresh: {round(thresh, 2)} ---")
 

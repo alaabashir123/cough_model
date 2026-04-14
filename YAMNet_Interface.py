@@ -12,7 +12,7 @@ class YAMNetClassifier:
     Input: Raw audio data.
     Output: 1035-feature classification (Embeddings + Physics + Veto Classes).
     """
-    def __init__(self, model_path='cough_mobile_expert.tflite'):
+    def __init__(self, model_path='audio_to_cough.tflite'):
         print("--- Initializing Clinical 1035 YAMNet Specialist ---")
         
         if not os.path.isabs(model_path):
@@ -21,21 +21,15 @@ class YAMNetClassifier:
             
         # 1. Load YAMNet (The Feature Extractor)
         self.yamnet = hub.load('https://tfhub.dev/google/yamnet/1')
-        
-        # 2. Load Custom 1035-input Expert MLP (The Decision Maker)
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Expert model not found at {model_path}")
-            
-        self.interpreter = tf.lite.Interpreter(model_path=model_path)
+        self.interpreter = tf.lite.Interpreter(model_path=model_path, experimental_delegates=None)
         self.interpreter.allocate_tensors()
-        self.input_details = self.interpreter.get_input_details()
+        self.input_details = self.interpreter.get_input_details()[0]['index']
         self.output_details = self.interpreter.get_output_details()
         
-        # 3. Clinical Veto Indices (Indices for AudioSet classes)
+        # 2. Clinical Veto Indices (Indices for AudioSet classes)
         # 0:Speech, 16:Laughter, 57:HandClap, 69:Cough, 70:ThroatClearing, 
         # 71:Sneeze, 72:Sniff, 303:DoorSlam
         self.veto_indices = [0, 16, 57, 69, 70, 71, 72, 303]
-        
         self._setup_class_names()
 
     def _setup_class_names(self):
@@ -51,7 +45,6 @@ class YAMNetClassifier:
         """
         # --- 1. SIGNAL STANDARDIZATION ---
         wav_data = np.array(wav_data).astype(np.float32)
-        
         # Peak Normalization to range [-1, 1]
         max_abs = np.max(np.abs(wav_data))
         if max_abs > 1.0:
@@ -70,13 +63,14 @@ class YAMNetClassifier:
 
         # --- 2. VOLUME GATE (THE SILENCE FILTER) ---
         rms = np.sqrt(np.mean(wav_data**2))
-        if rms < 0.003 or max_abs < 0.01:
+        if rms < 0.001 or max_abs < 0.01:
             return {
                 "preds": 0, "probs": 0.0, "verdict_level": 0, 
                 "top_class": "Silence/LowVol", "status": "Filtered (Silence)"
             }
 
         # --- 3. BIO-ACOUSTIC PHYSICS (The 'Macro' Features) ---
+        # Note: These must match the training script scaling exactly.
         peak = np.max(np.abs(wav_data))
         safe_rms = rms + 1e-6
         
@@ -116,7 +110,7 @@ class YAMNetClassifier:
             veto_probs
         ]).reshape(1, 1035).astype(np.float32)
 
-        self.interpreter.set_tensor(self.input_details[0]['index'], full_input)
+        self.interpreter.set_tensor(self.input_details, full_input)
         self.interpreter.invoke()
         
         prob_texture = self.interpreter.get_tensor(self.output_details[0]['index'])[0][0]
@@ -132,20 +126,19 @@ class YAMNetClassifier:
             fused_score = prob_texture * prob_physics 
         # 4. HYBRID VERDICT
         # Even if the fused score is low, we still check the YAMNet "Cough Presence" 
-        # as a safety bridge
+        # as a safety bridge (Gate B from our previous discussion).
         # Use frame-level max to catch coughs hidden in speech
         max_cough_presence = np.max(scores_np[:, 69]) 
         max_sneeze_presence = np.max(scores_np[:, 71])
         
         # Check if the general YAMNet winner is clinical
         is_yamnet_clinical = any(x in winner_name for x in ["Cough", "Sneeze", "Respiratory"])
-
         peak_strength = (crest/0.1) * ecr # Scaled impact measure
         # --- 4. THE INTEGRATED DECISION TREE ---
         prediction = 0
         verdict_level = 0
         status = ""
-        if fused_score < 0.01 and not is_yamnet_clinical:
+        if fused_score < 0.01 and max_cough_presence < 0.05 and not is_yamnet_clinical:
             prediction, verdict_level = 0, 0
             status = "REJECTED (Brain Certainty)"
         # GATE A: THE EXPERT SURE-HIT (Using Fusion)
@@ -153,9 +146,9 @@ class YAMNetClassifier:
             prediction, verdict_level = 1, 1
             status = "ACCEPTED (Expert High Prob)"
         
-        # GATE B: THE "PRESENCE" RESCUE
+        # GATE B: THE "PRESENCE" RESCUE (From your working old logic)
         # Catches coughs even if the whole segment is 'Speech'
-        elif max_cough_presence > 0.15 or max_sneeze_presence > 0.10 or peak_strength > 4.0:
+        elif max_cough_presence > 0.10 or max_sneeze_presence > 0.10 or peak_strength > 4.0:
             prediction, verdict_level = 1, 2
             if max_cough_presence > 0.15:
                 status = f"RESCUED (Cough Presence: {round(max_cough_presence,2)})"
@@ -168,7 +161,7 @@ class YAMNetClassifier:
             prediction, verdict_level = 1, 2
             status = "SUSPECT (Expert Mid Prob)"
         
-        # GATE D: THE STANDARD AI RESCUE
+        # GATE D: THE STANDARD AI RESCUE (From your working old logic)
         elif is_yamnet_clinical:
             prediction, verdict_level = 1, 2
             status = f"RESCUED (YAMNet {winner_name} Hint)"
