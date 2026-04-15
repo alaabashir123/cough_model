@@ -140,11 +140,8 @@ class YAMNetClassifier:
         prediction = 0
         verdict_level = 0
         status = ""
-        if fused_score < 0.01 and max_cough_presence < 0.05 and not is_yamnet_clinical:
-            prediction, verdict_level = 0, 0
-            status = "REJECTED (Brain Certainty)"
         # GATE A: THE EXPERT SURE-HIT (Using Fusion)
-        elif fused_score > 0.70:
+        if fused_score > 0.70:
             prediction, verdict_level = 1, 1
             status = "ACCEPTED (Expert High Prob)"
         
@@ -167,6 +164,11 @@ class YAMNetClassifier:
         elif is_yamnet_clinical:
             prediction, verdict_level = 1, 2
             status = f"RESCUED (YAMNet {winner_name} Hint)"
+            
+        # If AI is explicitly lost and it didn't trigger any physical rescues above
+        elif fused_score < 0.01 and max_cough_presence < 0.05 and not is_yamnet_clinical:
+            prediction, verdict_level = 0, 0
+            status = "REJECTED (Brain Certainty)"
             
         else:
             prediction, verdict_level = 0, 0

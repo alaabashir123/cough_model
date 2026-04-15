@@ -95,5 +95,5 @@ class AcousticRefiner:
                 valid_timestamps.append(round(p / 16000, 3))
                 # print(f"Audit Accepted: Crest:{round(crest,1)} ECR:{round(ecr,2)} ZCR:{round(zcr,2)}")
             # else:
-                # print(f"Audit Rejected: Crest:{round(crest,1)} ECR:{round(ecr,2)} ZCR:{round(zcr,2)}")
+            #     print(f"Audit Rejected: Crest:{round(crest,1)} ECR:{round(ecr,2)} ZCR:{round(zcr,2)}")
         return valid_timestamps

@@ -43,7 +43,7 @@ def sanitize_and_rename(target_path):
     print(f"\n--- Stage 0: Sanitizing Dataset in {target_path} ---")
     
     # 1. Look for .wav and .flac files (sorted for determinism)
-    files = sorted([f for f in os.listdir(target_path) if f.lower().endswith(('.wav', '.flac', '.mp3'))])
+    files = sorted([f for f in os.listdir(target_path) if f.lower().endswith(('.wav', '.flac', '.mp3', '.m4a'))])
     
     if not files:
         print("!!! No audio files found in directory.")
